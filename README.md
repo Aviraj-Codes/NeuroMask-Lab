@@ -1,4 +1,4 @@
-# NeuroMask Lab - Brain Tumor Segmentation with a 2D U-Net
+# Brain Tumor Segmentation with a 2D U-Net
 
 A reproducible student project for segmenting the **whole tumor** in multimodal brain MRI. It uses a compact PyTorch U-Net on axial slices from the Medical Segmentation Decathlon (MSD) Task01 BrainTumour dataset.
 
@@ -31,6 +31,7 @@ brain-tumor-segmentation/
 │   ├── explore_data.py
 │   ├── train.py
 │   ├── evaluate.py
+│   ├── plot_results.py
 │   └── predict.py
 ├── src/brain_tumor_seg/
 │   ├── data.py
@@ -97,6 +98,14 @@ python scripts/evaluate.py --data data/Task01_BrainTumour --checkpoint outputs/r
 
 This writes `outputs/run/test_metrics.json` and `outputs/run/split.json`. The test split is reconstructed from the saved checkpoint seed and case limit.
 
+Create the portfolio plots from the saved training history and test metrics without retraining:
+
+```powershell
+python scripts/plot_results.py
+```
+
+This saves `results/training_curves.png` (training and validation loss across epochs) and `results/dice_scores.png` (validation Dice by epoch plus held-out test Dice, IoU, precision, and recall when available). Add these generated images to GitHub if you want them to appear in the repository; `results/` is not excluded by `.gitignore`.
+
 ## 5. Visualize predictions
 
 ```powershell
@@ -126,15 +135,36 @@ See the official [Community Cloud deployment guide](https://docs.streamlit.io/de
 
 For a binary mask, Dice is `2 × intersection / (prediction pixels + reference pixels)` and IoU is `intersection / union`. Both range from 0 to 1, with larger values indicating more overlap. This implementation reports the unweighted average of per-slice metrics. For a stronger portfolio study, add per-patient volume metrics, repeat several seeds, compare against a simple baseline, and discuss the effects of 2D context and class imbalance.
 
-## Example run
+## Example run and results
 
-One preliminary run on the 20-case subset used 5 epochs on CPU. The seeded patient-level split contained 14 training cases, 3 validation cases, and 3 held-out test cases. At epoch 5, validation Dice was `0.6031` and validation IoU was `0.5379`. The final held-out test metrics reported by that run were Dice `0.7279` and IoU `0.6571`.
+The plotted run used 20 labeled patients, a 14/3/3 patient-level train/validation/test split, 5 epochs, and CPU. Training loss decreased from `1.123` to `0.524`; validation loss decreased from `0.970` to `0.628`. Validation Dice rose from `0.547` at epoch 1 to `0.603` at epoch 5.
 
-These scores are specific to this small run. Metrics are averaged over sampled axial slices, and empty-reference/empty-prediction slices score 1; the three-patient test set is too small for a reliable benchmark claim. The prediction image below is a qualitative example from `BRATS_004`, not a confirmed held-out test case. Run `scripts/evaluate.py` to compute precision and recall for this saved checkpoint.
+On the held-out split of 3 patients, the reported slice-averaged metrics were:
+
+| Metric | Score |
+|---|---:|
+| Dice | 0.724 |
+| IoU | 0.652 |
+| Precision | 0.697 |
+| Recall | 0.822 |
+
+These are preliminary results from a small subset and only 5 epochs, not a robust benchmark. Metrics are averaged over sampled axial slices. Empty-reference/empty-prediction slices score 1 for Dice, IoU, and precision; recall is 1 when the reference slice contains no tumor. The held-out test set has only 3 patients, so these scores should be interpreted cautiously.
+
+### Training curves
+
+![Training and validation loss across five epochs](results/training_curves.png)
+
+Both losses decreased over these five epochs. This shows improvement during this short run, but is not enough evidence to establish convergence or rule out overfitting.
+
+### Validation Dice and held-out test metrics
+
+![Validation Dice by epoch and held-out test metrics](results/dice_scores.png)
+
+### Example segmentation
 
 ![FLAIR input, reference mask, and U-Net prediction for BRATS_004](outputs/prediction.png)
 
-The example prediction follows the main tumor region and includes a few small isolated false-positive areas. It illustrates one slice only and does not replace test-set evaluation.
+This is a qualitative example from `BRATS_004`; it is not confirmed to be from the held-out test split. It follows the main tumor region and includes a few small isolated false-positive areas. One slice does not replace test-set evaluation.
 
 ## Limitations
 
