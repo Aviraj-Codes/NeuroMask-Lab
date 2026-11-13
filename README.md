@@ -30,6 +30,7 @@ brain-tumor-segmentation/
 │   ├── download_subset.py
 │   ├── explore_data.py
 │   ├── train.py
+│   ├── evaluate.py
 │   └── predict.py
 ├── src/brain_tumor_seg/
 │   ├── data.py
@@ -76,7 +77,7 @@ Both approaches produce `data/Task01_BrainTumour/` with `imagesTr/` and `labelsT
 python scripts/explore_data.py --data data/Task01_BrainTumour
 ```
 
-The script reports the number of paired cases, inspects a few volume shapes and tumor voxels, and saves an example slice to `outputs/data_overview.png`. Preprocessing is deliberately minimal and reproducible: each MRI channel is z-scored over nonzero brain voxels, clipped to `[-5, 5]`, and every nonzero label is combined into one tumor mask. The data loader uses every tumor-containing axial slice plus every fourth empty slice, reducing the easy-background imbalance.
+The script reports paired cases, raw label voxel counts, sample volume shapes, tumor voxels, and normalized channel statistics, then saves an example slice to `outputs/data_overview.png`. Preprocessing is deliberate and reproducible: each MRI channel is z-scored over nonzero brain voxels, clipped to `[-5, 5]`, and every nonzero label is combined into one tumor mask. Axial slices are read on demand; every tumor-containing slice and every fourth empty slice is used to reduce easy-background imbalance. The native 240×240 in-plane resolution is preserved rather than resized, avoiding extra interpolation and keeping the original detail.
 
 ## 4. Train
 
@@ -84,9 +85,17 @@ The script reports the number of paired cases, inspects a few volume shapes and 
 python scripts/train.py --data data/Task01_BrainTumour --max-cases 0 --epochs 20
 ```
 
-Options include `--batch-size`, `--lr`, `--seed`, `--workers`, and `--output`. Set `--max-cases 0` to use every locally downloaded patient. The random split is performed on complete patient volumes before slices are generated, so slices from one patient cannot cross the train, validation, and test boundaries. The seed and arguments are recorded in the best checkpoint. Validation Dice selects the saved checkpoint; final held-out test Dice and IoU are written to `outputs/run/test_metrics.json` after training.
+Options include `--batch-size`, `--lr`, `--seed`, `--workers`, and `--output`. Set `--max-cases 0` to use every locally downloaded patient. The random split is performed on complete patient volumes before slices are generated, so slices from one patient cannot cross the train, validation, and test boundaries. The seed and exact patient IDs are saved in `outputs/run/split.json`; the seed and arguments are also recorded in the best checkpoint. Validation Dice selects the saved checkpoint.
 
-The objective is binary cross-entropy with logits plus soft Dice loss. Reported Dice and IoU are thresholded at 0.5 and averaged over sampled axial slices. Empty-reference/empty-prediction slices score 1, so also state that convention when comparing results. A small subset or short run may perform poorly; results must be taken from your own run and should not be presented as clinical performance.
+The objective is binary cross-entropy with logits plus soft Dice loss. Dice, IoU, precision, and recall use a 0.5 threshold and are averaged across sampled axial slices. Empty-reference/empty-prediction slices score 1 for Dice, IoU, and precision; recall is 1 when the reference slice contains no tumor. These conventions are saved with test metrics. A small subset or short run may perform poorly; results must be taken from your own run and should not be presented as clinical performance.
+
+To evaluate an existing best checkpoint (including the first 5-epoch run) and save the exact split and all four metrics without retraining:
+
+```powershell
+python scripts/evaluate.py --data data/Task01_BrainTumour --checkpoint outputs/run/best_model.pt
+```
+
+This writes `outputs/run/test_metrics.json` and `outputs/run/split.json`. The test split is reconstructed from the saved checkpoint seed and case limit.
 
 ## 5. Visualize predictions
 
@@ -121,7 +130,7 @@ For a binary mask, Dice is `2 × intersection / (prediction pixels + reference p
 
 One preliminary run on the 20-case subset used 5 epochs on CPU. The seeded patient-level split contained 14 training cases, 3 validation cases, and 3 held-out test cases. At epoch 5, validation Dice was `0.6031` and validation IoU was `0.5379`. The final held-out test metrics reported by that run were Dice `0.7279` and IoU `0.6571`.
 
-These scores are specific to this small run. Metrics are averaged over sampled axial slices, and empty-reference/empty-prediction slices score 1; the three-patient test set is too small for a reliable benchmark claim. The prediction image below is a qualitative example from `BRATS_004`, not a confirmed held-out test case.
+These scores are specific to this small run. Metrics are averaged over sampled axial slices, and empty-reference/empty-prediction slices score 1; the three-patient test set is too small for a reliable benchmark claim. The prediction image below is a qualitative example from `BRATS_004`, not a confirmed held-out test case. Run `scripts/evaluate.py` to compute precision and recall for this saved checkpoint.
 
 ![FLAIR input, reference mask, and U-Net prediction for BRATS_004](outputs/prediction.png)
 
