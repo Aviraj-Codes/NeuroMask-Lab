@@ -1,4 +1,4 @@
-# Brain Tumor Segmentation with a 2D U-Net
+# NeuroMask Lab - Brain Tumor Segmentation with a 2D U-Net
 
 A reproducible student project for segmenting the **whole tumor** in multimodal brain MRI. It uses a compact PyTorch U-Net on axial slices from the Medical Segmentation Decathlon (MSD) Task01 BrainTumour dataset.
 
