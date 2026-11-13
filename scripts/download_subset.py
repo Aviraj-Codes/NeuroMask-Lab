@@ -9,17 +9,14 @@ from botocore import UNSIGNED
 from botocore.config import Config
 from botocore.exceptions import ConnectionClosedError, EndpointConnectionError, ReadTimeoutError
 
-
 class S3RangeReader:
     """Small seekable file wrapper that fetches cached byte ranges from S3."""
     def __init__(self, client, bucket, key, size, block_size=256 * 1024):
         self.client, self.bucket, self.key = client, bucket, key
         self.size, self.block_size, self.position = size, block_size, 0
         self.cache_offset, self.cache = -1, b""
-
     def tell(self):
         return self.position
-
     def seek(self, offset, whence=0):
         if whence == 0:
             position = offset
@@ -33,7 +30,6 @@ class S3RangeReader:
             raise ValueError("Negative seek position")
         self.position = min(position, self.size)
         return self.position
-
     def read(self, size=-1):
         if size is None or size < 0:
             size = self.size - self.position
@@ -69,7 +65,6 @@ class S3RangeReader:
             size -= amount
         return bytes(output)
 
-
 def main():
     parser = argparse.ArgumentParser(
         description="Fetch a small labeled MSD BrainTumour subset without downloading the full 7.6 GB archive"
@@ -80,7 +75,6 @@ def main():
     args = parser.parse_args()
     if args.cases < 3:
         parser.error("--cases must be at least 3 for train/validation/test splitting")
-
     bucket = "msd-for-monai"
     key = "Task01_BrainTumour.tar"
     client = boto3.client(
@@ -96,7 +90,6 @@ def main():
         size = client.head_object(Bucket=bucket, Key=key)["ContentLength"]
     except Exception as exc:
         raise RuntimeError(f"Could not access public archive s3://{bucket}/{key}: {exc}") from exc
-
     print("Scanning the remote archive index (this can take a few minutes)...", flush=True)
     remote_file = S3RangeReader(client, bucket, key, size)
     with tarfile.open(fileobj=remote_file, mode="r:") as archive:
@@ -119,7 +112,6 @@ def main():
             )
         if args.cases > len(pairs):
             raise ValueError(f"Requested {args.cases} cases but found {len(pairs)} labeled cases")
-
         random.Random(args.seed).shuffle(pairs)
         selected = sorted(pairs[:args.cases], key=lambda item: item[0])
         root = Path(args.data)
@@ -138,10 +130,8 @@ def main():
             base = PurePosixPath(member.name).name
             if base in {"dataset.json", "LICENSE.txt", "license.txt"} and member.isfile():
                 (root / base).write_bytes(archive.extractfile(member).read())
-
     print(f"Downloaded {len(selected)} paired cases ({total_bytes / (1024**2):.1f} MiB) to {root}")
     print(f"Subset selection seed: {args.seed}")
-
 
 if __name__ == "__main__":
     main()

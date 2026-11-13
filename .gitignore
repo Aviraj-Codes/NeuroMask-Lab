@@ -6,3 +6,4 @@ outputs/run/
 outputs/*.png
 outputs/*.json
 *.pt
+!models/README.md
